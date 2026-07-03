@@ -32,7 +32,7 @@ class EaiKTNet(nn.Module):
         self.emb_type = emb_type
         self.emb_size = emb_size
         self.que_emb = QueEmbedder(num_q, emb_size, emb_path, flag_load_emb, flag_emb_freezed, self.model_name)
-        self.qa_embed = nn.Embedding(2, self.emb_size)
+        self.interaction_proj = nn.Linear(self.emb_size * 2, self.emb_size)
         
         self.model = Architecture(num_q=num_q, n_blocks=n_blocks, n_heads=num_attn_heads, dropout=dropout,
                                   d_model=self.emb_size, d_feature=int(self.emb_size / num_attn_heads), d_ff=d_ff,
@@ -51,7 +51,13 @@ class EaiKTNet(nn.Module):
 
     def base_emb(self, q, c, r):
         q_embed_data = self.que_emb(q) 
-        qa_embed_data = self.qa_embed(r) + q_embed_data 
+        zeros = torch.zeros_like(q_embed_data)
+        r_bool = r.unsqueeze(-1).bool()
+        left_part = torch.where(r_bool, q_embed_data, zeros)
+        right_part = torch.where(r_bool, zeros, q_embed_data)
+        concat_embed = torch.cat([left_part, right_part], dim=-1)
+        qa_embed_data = self.interaction_proj(concat_embed)
+ 
         return q_embed_data, qa_embed_data
 
     def forward(self, q, c, r):
