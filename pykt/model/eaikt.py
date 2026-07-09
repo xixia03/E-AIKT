@@ -66,9 +66,7 @@ class EaiKTNet(nn.Module):
         
         d_output = self.model(q_embed_data, qa_embed_data)
         
-        raw_alpha = (d_output * q_embed_data).sum(dim=-1)
-
-        alpha = torch.sigmoid(raw_alpha)
+        alpha = (d_output * q_embed_data).sum(dim=-1)
 
         if self.num_q > 0:
             beta = self.beta(q).squeeze(-1)
