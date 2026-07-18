@@ -32,10 +32,10 @@ class EaiKTNet(nn.Module):
         self.emb_type = emb_type
         self.emb_size = emb_size
         self.que_emb = QueEmbedder(num_q, emb_size, emb_path, flag_load_emb, flag_emb_freezed, self.model_name)
-        self.interaction_proj = nn.Linear(self.emb_size * 2, self.emb_size)
+        self.W_alpha = nn.Linear(self.emb_size * 2, self.emb_size)
         
         self.model = Architecture(num_q=num_q, n_blocks=n_blocks, n_heads=num_attn_heads, dropout=dropout,
-                                  d_model=self.emb_size, d_feature=int(self.emb_size / num_attn_heads), d_ff=d_ff,
+                                  d_model=self.emb_size * 2, d_feature=int((self.emb_size * 2 ) / num_attn_heads), d_ff=d_ff,
                                   kq_same=self.kq_same, model_type=self.model_type)
                                   
         if self.num_q > 0:
@@ -56,7 +56,7 @@ class EaiKTNet(nn.Module):
         left_part = torch.where(r_bool, q_embed_data, zeros)
         right_part = torch.where(r_bool, zeros, q_embed_data)
         concat_embed = torch.cat([left_part, right_part], dim=-1)
-        qa_embed_data = self.interaction_proj(concat_embed)
+        qa_embed_data = concat_embed
  
         return q_embed_data, qa_embed_data
 
@@ -65,8 +65,8 @@ class EaiKTNet(nn.Module):
         c_reg_loss = 0.
         
         d_output = self.model(q_embed_data, qa_embed_data)
-        
-        alpha = (d_output * q_embed_data).sum(dim=-1)
+        projected_h = self.W_alpha(d_output)
+        alpha = (projected_h * q_embed_data).sum(dim=-1)
 
         if self.num_q > 0:
             beta = self.beta(q).squeeze(-1)
