@@ -32,6 +32,7 @@ class EaiKTNet(nn.Module):
         self.emb_type = emb_type
         self.emb_size = emb_size
         self.que_emb = QueEmbedder(num_q, emb_size, emb_path, flag_load_emb, flag_emb_freezed, self.model_name)
+        self.q_proj = nn.Linear(self.emb_size, self.emb_size * 2)
         self.W_alpha = nn.Linear(self.emb_size * 2, self.emb_size)
         
         self.model = Architecture(num_q=num_q, n_blocks=n_blocks, n_heads=num_attn_heads, dropout=dropout,
@@ -63,8 +64,9 @@ class EaiKTNet(nn.Module):
     def forward(self, q, c, r):
         q_embed_data, qa_embed_data = self.base_emb(q, c, r)
         c_reg_loss = 0.
-        
-        d_output = self.model(q_embed_data, qa_embed_data)
+
+        q_embed_data_2d = self.q_proj(q_embed_data)
+        d_output = self.model(q_embed_data_2d, qa_embed_data)
         projected_h = self.W_alpha(d_output)
         alpha = (projected_h * q_embed_data).sum(dim=-1)
 
